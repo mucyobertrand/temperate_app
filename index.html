@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPEES402 Temperature Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --card-bg: #ffffff;
+    --border: #e1e3e8;
+    --text-primary: #1a1a1a;
+    --text-secondary: #6b7280;
+    --text-tertiary: #9ca3af;
+    --green-bg: #e8f6ee;
+    --green-text: #0f6e56;
+    --red-bg: #fcebeb;
+    --red-text: #a32d2d;
+    --blue: #378ADD;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    margin: 0;
+    padding: 2rem;
+    color: var(--text-primary);
+  }
+
+  .container {
+    max-width: 700px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    padding: 1.5rem;
+  }
+
+  .header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+  }
+
+  .candidate-name {
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .conn-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 8px;
+    background: #f1f2f4;
+    color: var(--text-secondary);
+  }
+
+  .conn-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-tertiary);
+    display: inline-block;
+  }
+
+  .temp-row {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+
+  .temp-value {
+    font-size: 56px;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .temp-unit {
+    font-size: 24px;
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+
+  .status-pill {
+    margin-left: 8px;
+    font-size: 12px;
+    padding: 4px 12px;
+    border-radius: 8px;
+    background: #f1f2f4;
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+
+  .last-update {
+    font-size: 13px;
+    color: var(--text-tertiary);
+    margin: 0;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .stat-box {
+    background: #bfcbe2;
+    border-radius: 8px;
+    padding: 1rem;
+  }
+
+  .stat-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0 0 6px;
+  }
+
+  .stat-value {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .section-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 1rem;
+  }
+
+  .chart-wrap {
+    position: relative;
+    height: 180px;
+  }
+
+  .hint {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0 0 1rem;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 1rem;
+  }
+
+  input[type="text"] {
+    flex: 1;
+    height: 36px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0 12px;
+    font-size: 14px;
+  }
+
+  input[type="range"] {
+    flex: 1;
+  }
+
+  button {
+    height: 36px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fff;
+    padding: 0 16px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  button:hover {
+    background: #f6f7f8;
+  }
+
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .slider-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+
+  .sim-out {
+    font-size: 13px;
+    font-weight: 600;
+    min-width: 32px;
+  }
+
+  .log-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 160px;
+    overflow-y: auto;
+  }
+
+  .log-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .log-time { color: var(--text-secondary); }
+  .log-temp { font-weight: 600; }
+
+  .empty-log {
+    font-size: 13px;
+    color: var(--text-tertiary);
+    margin: 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <div class="card">
+    <div class="header-row">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span class="candidate-name" id="candidate-name">IRASUBIZA MUCYO Bertrand</span>
+      </div>
+      <div class="conn-badge">
+        <span class="conn-dot" id="conn-dot"></span>
+        <span id="conn-text">Waiting for data</span>
+      </div>
+    </div>
+
+    <div class="temp-row">
+      <span class="temp-value" id="temp-value">--.-</span>
+      <span class="temp-unit">&deg;C</span>
+      <span class="status-pill" id="status-pill">NORMAL</span>
+    </div>
+    <p class="last-update" id="last-update">No readings yet</p>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-box">
+      <p class="stat-label">Min</p>
+      <p class="stat-value" id="min-temp">--.-&deg;C</p>
+    </div>
+    <div class="stat-box">
+      <p class="stat-label">Max</p>
+      <p class="stat-value" id="max-temp">--.-&deg;C</p>
+    </div>
+    <div class="stat-box">
+      <p class="stat-label">Average</p>
+      <p class="stat-value" id="avg-temp">--.-&deg;C</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="section-title">Live trend</p>
+    <div class="chart-wrap">
+      <canvas id="chart"></canvas>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="section-title">Add a reading</p>
+    <p class="hint">Paste a line in the format used by the PC script (e.g. 27.4,NORMAL), or use the slider to simulate a value.</p>
+    <div class="input-row">
+      <input type="text" id="manual-input" placeholder="27.4,NORMAL" />
+      <button id="manual-add">Add reading</button>
+    </div>
+    <div class="slider-row">
+      <span class="slider-label">Simulate temp</span>
+      <input type="range" min="10" max="45" value="27" step="1" id="sim-slider" />
+      <span class="sim-out" id="sim-out">27&deg;C</span>
+      <button id="sim-add">Add</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="section-title">Recent readings</p>
+    <div class="log-list" id="log-list">
+      <p class="empty-log">No readings logged yet.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  const THRESHOLD = 30.0;
+  let readings = [];
+  let chart;
+  let lastSeenTimestamp = null;
+
+  const tempValueEl = document.getElementById('temp-value');
+  const statusPill = document.getElementById('status-pill');
+  const lastUpdateEl = document.getElementById('last-update');
+  const connDot = document.getElementById('conn-dot');
+  const connText = document.getElementById('conn-text');
+  const minEl = document.getElementById('min-temp');
+  const maxEl = document.getElementById('max-temp');
+  const avgEl = document.getElementById('avg-temp');
+  const logList = document.getElementById('log-list');
+  const candidateNameEl = document.getElementById('candidate-name');
+
+  function fmt(n) {
+    return Number(n).toFixed(1);
+  }
+
+  function colorForStatus(status) {
+    return status === 'HIGH'
+      ? { bg: 'var(--red-bg)', text: 'var(--red-text)' }
+      : { bg: 'var(--green-bg)', text: 'var(--green-text)' };
+  }
+
+  function addReading(temp, status, timestampMs) {
+    const time = timestampMs ? new Date(timestampMs) : new Date();
+    readings.push({ temp: temp, status: status, time: time });
+    if (readings.length > 30) readings.shift();
+    render();
+  }
+
+  function setConnectionState(connected) {
+    if (connected) {
+      connDot.style.background = '#1d9e75';
+      connText.textContent = 'Receiving data';
+    } else {
+      connDot.style.background = '#e24b4a';
+      connText.textContent = 'Disconnected';
+    }
+  }
+
+  async function pollServer() {
+    try {
+      const res = await fetch('/data');
+      if (!res.ok) throw new Error('Server not reachable');
+      const json = await res.json();
+
+      if (json.candidate_name) {
+        candidateNameEl.textContent = json.candidate_name;
+      }
+
+      setConnectionState(json.latest && json.latest.connected);
+
+      if (json.log && json.log.length > 0) {
+        readings = json.log.map(function (r) {
+          return { temp: r.temp, status: r.status, time: new Date(r.timestamp * 1000) };
+        });
+        const latestTs = json.latest.timestamp;
+        if (latestTs !== lastSeenTimestamp) {
+          lastSeenTimestamp = latestTs;
+        }
+        render();
+      }
+    } catch (err) {
+      setConnectionState(false);
+    }
+  }
+
+  function render() {
+    if (readings.length === 0) return;
+    const latest = readings[readings.length - 1];
+
+    tempValueEl.textContent = fmt(latest.temp);
+    const c = colorForStatus(latest.status);
+    statusPill.textContent = latest.status;
+    statusPill.style.background = c.bg;
+    statusPill.style.color = c.text;
+
+    lastUpdateEl.textContent = 'Last updated ' + latest.time.toLocaleTimeString();
+
+    const temps = readings.map(function (r) { return r.temp; });
+    minEl.textContent = fmt(Math.min.apply(null, temps)) + '\u00b0C';
+    maxEl.textContent = fmt(Math.max.apply(null, temps)) + '\u00b0C';
+    avgEl.textContent = fmt(temps.reduce(function (a, b) { return a + b; }, 0) / temps.length) + '\u00b0C';
+
+    logList.innerHTML = '';
+    readings.slice().reverse().slice(0, 8).forEach(function (r) {
+      const row = document.createElement('div');
+      row.className = 'log-row';
+      const rc = colorForStatus(r.status);
+      row.innerHTML =
+        '<span class="log-time">' + r.time.toLocaleTimeString() + '</span>' +
+        '<span class="log-temp">' + fmt(r.temp) + '\u00b0C</span>' +
+        '<span style="color:' + rc.text + '; font-weight:600;">' + r.status + '</span>';
+      logList.appendChild(row);
+    });
+
+    updateChart();
+  }
+
+  function updateChart() {
+    const labels = readings.map(function (r) { return r.time.toLocaleTimeString(); });
+    const data = readings.map(function (r) { return r.temp; });
+
+    if (!chart) {
+      const ctx = document.getElementById('chart').getContext('2d');
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: data,
+            borderColor: '#378ADD',
+            backgroundColor: 'rgba(55,138,221,0.08)',
+            borderWidth: 2,
+            tension: 0.3,
+            fill: true,
+            pointRadius: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { display: false },
+            y: { ticks: { font: { size: 11 } }, grid: { color: 'rgba(128,128,128,0.1)' } }
+          }
+        }
+      });
+    } else {
+      chart.data.labels = labels;
+      chart.data.datasets[0].data = data;
+      chart.update();
+    }
+  }
+
+  document.getElementById('manual-add').addEventListener('click', function () {
+    const val = document.getElementById('manual-input').value.trim();
+    const parts = val.split(',');
+    if (parts.length === 2) {
+      const t = parseFloat(parts[0]);
+      const s = parts[1].trim().toUpperCase();
+      if (!isNaN(t)) {
+        addReading(t, s === 'HIGH' ? 'HIGH' : 'NORMAL');
+        document.getElementById('manual-input').value = '';
+      }
+    }
+  });
+
+  const slider = document.getElementById('sim-slider');
+  const simOut = document.getElementById('sim-out');
+  slider.addEventListener('input', function () {
+    simOut.textContent = slider.value + '\u00b0C';
+  });
+
+  document.getElementById('sim-add').addEventListener('click', function () {
+    const t = parseFloat(slider.value);
+    addReading(t, t > THRESHOLD ? 'HIGH' : 'NORMAL');
+  });
+
+  setConnectionState(false);
+  pollServer();
+  setInterval(pollServer, 1000);
+})();
+</script>
+
+</body>
+</html>
